@@ -12,6 +12,8 @@ The animated image below renders a playing round performed by the reinforcement 
 
 ![Landing on the Moon](images/landing.gif)
 
+According to the game rules, the play is solved when the total reward of an episode is at least equal to 200.
+
 ## The playing framework
 
 The **observation space** is the set of information describing the environment at each playing step (8-dimensional vector): the coordinates of the lander in x and y, its linear velocities in x and y, its angle, its angular velocity, and two booleans that represent whether each leg is in contact with the ground or not.
@@ -26,7 +28,7 @@ The script `LunarLander.py` contains a Python class (`Autopilot`) that implement
 
 ## The Autopilot class
 
-The `Autopilot` class requires four kinds of parameters for initialization. 
+The `Autopilot` class requires four kinds of parameters for initialization.
 
 ### Model architecture
 
