@@ -53,7 +53,9 @@ During training, the agent store experience using a `memory_buffer` of 65,536 ev
 ## Playing with the autopilot
 
 ```
-# Import the package
+# Import packages
+import gym
+import pickle
 import LunarLander as ll
 
 # Define the environment
