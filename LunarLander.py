@@ -52,7 +52,6 @@ class Autopilot:
         if replay_buffer > memory_buffer:
             replay_buffer = memory_buffer
         self.memory_buffer = memory_buffer
-        self.memory_size = 0
         self.replay_buffer = replay_buffer
         self.replay_size = 0
         self.memory_stack = deque(maxlen=memory_buffer)
@@ -220,16 +219,6 @@ class Autopilot:
             train_rewards = bin_mean(self.train_rewards, window=bin_window)
         return train_rewards
 
-    def test(self, n_episodes):
-        """
-        Test the agent performance
-
-        :param n_episodes: integer, number of episodes to run.
-        :return: numeric list, total reward obtained at each training episode, sorted in time order.
-        """
-        total_rewards = [self.play(environment) for i in range(n_episodes)]
-        return total_rewards
-
     def model_save(self, path):
         """
         Export the Q-network checkpoint
@@ -296,3 +285,15 @@ def play(environment, agent, render=False, sleep=0):
         time.sleep(sleep * 2)
         environment.close()
     return {'duration': duration, 'reward': episode_reward, 'rest': reward >= 100, 'solved': episode_reward >= 200}
+
+def test(environment, agent, n_episodes):
+    """
+    Test the agent performance
+
+    :param environment: the LunarLander-v2 gym environment.
+    :param agent: an agent of Autopilot class.
+    :param n_episodes: integer, number of episodes to run.
+    :return: numeric list, total reward obtained at each training episode, sorted in time order.
+    """
+    total_rewards = [play(environment, agent) for i in range(n_episodes)]
+    return total_rewards
