@@ -1,8 +1,12 @@
-# Solving the discrete lunar lander problem with Deep Q-Network in PyTorch
+# Solving the discrete lunar lander problem with Double Deep Q-Network in PyTorch
 
-LunarLander is a 2D playing environment of the [gym Python library](https://github.com/openai/gym) from OpenAI. The games provided by `gym` have a special feature: you can interact with the playing environment by command line. Therefore, by using a terminal, you can get the status of the environment, make your action and evaluate the new status of the environment, then take another action, and so on until the game termination.
+LunarLander is a 2D playing environment of the [Gym Python library](https://github.com/openai/gym) from OpenAI, now maintained by the Farama Foundation under the name of Gymnasium. The games provided by Gym have a special feature: you can interact with the playing environment by command line. Therefore, by using a terminal, you can get the status of the environment, take your action and evaluate the new status of the environment, then take another action, and so on until the game termination.
 
-To get started with `gym`, please inspect the [official page](https://www.gymlibrary.dev/). Moreover, you can find a good tutorial [here](https://blog.paperspace.com/getting-started-with-openai-gym/).
+To get started with `gymnasium`, please inspect the [official page](https://gymnasium.farama.org/). Moreover, [here](https://blog.paperspace.com/getting-started-with-openai-gym/) you can find a good tutorial based on the original Gym.
+
+## Requirements
+
+This repository is based on the Python package `gymnasium` version `0.28.1`. Gymnasium is a fork of OpenAI's Gym library maintained by developers of the Farama Foundation (OpenAI no longer maintains the original project).
 
 ## The lunar lander problem
 
@@ -24,7 +28,7 @@ The **reward system** are the rules followed by the environment to send rewards 
 
 ## Content of this repository
 
-The script `LunarLander.py` contains a Python class (`Autopilot`) that implements an agent driving the lander, which uses a Deep Q-Network (DQN) to make decisions about actions. The `cache` stores a backup of a trained agent ready to use (see the notes in the notebook `main.ipynb`). This agent solves about the 99% of episodes with a mean total reward of 254.6 (see the notebook).
+The script `LunarLander.py` contains a Python class (`Autopilot`) that implements an agent driving the lander, which uses a Double Deep Q-Network (DDQN) to make decisions about actions. The `cache` stores a backup of a trained agent ready to use, trained with the code stored in the script `training.py` (see the notes in the notebook `evaluation.ipynb`). This agent solves about the 99% of episodes with a mean total reward of 254.6 (see the notebook).
 
 ## The Autopilot class
 
@@ -32,11 +36,11 @@ The `Autopilot` class requires four kinds of parameters for initialization.
 
 ### Model architecture
 
-The Deep Q-Network comes from the argument `model` as a class inheriting from `torch.nn.Module`. By default, the Q-network has two dense hidden layers of size 32 and 64 with ReLU activation functions. The inputs are the observations from the environment (8 values), while the outputs are the Q-values associated with each possible action (4 values).
+The Q-Network comes from the argument `model` as a class inheriting from `torch.nn.Module`. By default, the Q-network has two dense hidden layers of size 32 and 64 with ReLU activation functions. The inputs are the observations from the environment (8 values), while the outputs are the Q-values associated with each possible action (4 values).
 
-Model parameters are optimized by the Adam algorithm with a learning rate `lr=0.0001`.
+Model parameters are optimized by the Adam algorithm using the Huber loss function with a learning rate `lr=0.001`.
 
-The DQN is implemented using experience replay and a target network that is synchronized with the leading network at the end of each episode.
+The DDQN is implemented using experience replay and a target network that is synchronized with the leading network at the end of each episode.
 
 ### Accounting of rewards
 
@@ -44,7 +48,7 @@ The rewards obtained during an episode are discounted for a `gamma=0.99` as they
 
 ### Epsilon greedy policy
 
-The DQN algorithm is based on an *epsilon*-greedy strategy to balance exploration and exploitation. The training starts with a full random search (`epsilon_start=1.0`), and progressively decreases *epsilon* until a minimum (`epsilon_min=0.01`). The decrease is driven by a coefficient (`epsilon_decay=0.999`) updating the current *epsilon* value after each episode.
+The DDQN algorithm is based on an *epsilon*-greedy strategy to balance exploration and exploitation. The training starts with a full random search (`epsilon_start=1.0`), and progressively decreases *epsilon* until a minimum (`epsilon_min=0.01`). The decrease is driven by a coefficient (`epsilon_decay=0.98`) updating the current *epsilon* value after each episode.
 
 ### Experience replay
 
@@ -54,17 +58,14 @@ During training, the agent store experience using a `memory_buffer` of 65,536 ev
 
 ```
 # Import packages
-import gym
+import gymnasium as gym
 import pickle
 import LunarLander as ll
-
-# Define the environment
-env = gym.make('LunarLander-v2')
 
 # Load the trained agent from the cache
 with open('cache/agent.pickle', 'rb') as file:
     agent = pickle.load(file)
 
 # Play an episode
-ll.play(env, agent, render=True, sleep=0.01)
+ll.play(agent, sleep=0.01, random_state=1982, render=True)
 ```

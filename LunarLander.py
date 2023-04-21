@@ -1,10 +1,13 @@
+import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
+from copy import deepcopy
 import random
 import time
+import pdb
 
 class Q_Network(nn.Module):
     """
@@ -15,11 +18,13 @@ class Q_Network(nn.Module):
         super().__init__()
         self.dense1 = nn.Linear(8, 32)
         self.dense2 = nn.Linear(32, 64)
-        self.output = nn.Linear(64, 4)
+        self.dense3 = nn.Linear(64, 16)
+        self.output = nn.Linear(16, 4)
 
     def forward(self, x):
         x = F.relu(self.dense1(x))
         x = F.relu(self.dense2(x))
+        x = F.relu(self.dense3(x))
         x = self.output(x)
         return x
 
@@ -27,7 +32,7 @@ class Autopilot:
     """
     Autopilot of the space shuttle (agent)
     """
-    def __init__(self, environment, model=Q_Network, epsilon_start=1.0, epsilon_min=0.01, epsilon_decay=0.999, gamma=0.99, memory_buffer=2**16, replay_buffer=64, lr=0.0001):
+    def __init__(self, environment, model=Q_Network, epsilon_start=1.0, epsilon_min=0.01, epsilon_decay=0.98, gamma=0.99, memory_buffer=2**16, replay_buffer=64, lr=0.001):
         """
         :param environment:
         :param model:
@@ -63,7 +68,7 @@ class Autopilot:
         self.model.eval()
         self.target.eval()
         # Optimization features
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.HuberLoss(delta=10) #nn.MSELoss()
         self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr=lr)
 
     def decide(self, state):
@@ -114,14 +119,16 @@ class Autopilot:
         Calculate Q-values and update model parameters
 
         :param batch: a tuple containing:
-        - state1: numpy array, state after before taking an action.
+        - state1: numpy array, state before taking an action.
         - action: integer list, action taken at t1.
         - reward: numeric list, reward obtained taking the action.
         - state2: numpy array, state after taking an action.
         - done: boolean list, it specifies if the episode is terminated.
         """
-        # Reshape the experience batch
+        # Reshape the experience batch stacking elements in vectors
+        # batch_i = (prev_state, action, reward, curr_state, done)
         batch = self.__reshape_batch(batch)
+        #batch = tuple(map(list, zip(*batch)))
         # Convert inputs to torch tensors
         state1 = torch.from_numpy(np.stack(batch[0], axis=0))
         state2 = torch.from_numpy(np.stack(batch[3], axis=0))
@@ -138,10 +145,15 @@ class Autopilot:
         # From the resulting state, compute the Q-value for each action at t2
         # (t2 is after receiving the reward, so these are the Q-values "in hindsight")
         with torch.no_grad():
-            Q2 = self.target(state2)
-        # Get the maximum Q-value at t2 (corresponding to the action it would have been better to take)
-        maxQ2 = torch.max(Q2, dim=1)[0] # Vanilla DQN
-        #maxQ2 = Q2.gather(dim=1, index=action).squeeze(dim=1) # Double DQN
+            # Values of the next actions according to the online network
+            Q2_online = self.model(state2)
+            # Values of the next actions according to the target network
+            Q2_target = self.target(state2)
+        # Action to take according to the online network
+        next_action = torch.argmax(Q2_online, dim=1).view(-1,1)
+        # Q-value at t2 (corresponding to the action it will is better to take)
+        maxQ2 = Q2_target.gather(dim=1, index=next_action).squeeze(dim=1)
+        # maxQ2 = torch.max(Q2_target, dim=1)[0] # Vanilla DQN (max Q-value at t2)
         # Correct the maxQ by reinforcing it with reward and apply the discount
         Y = reward + self.gamma * undone * maxQ2
         # Compute the loss
@@ -165,7 +177,7 @@ class Autopilot:
         trace_episodes = 0
         for i in range(n_episodes):
             self.train_rewards.append(0.0) # Initialize the episode reward
-            curr_state = environment.reset() # Reset the environment and obtain the initial state
+            curr_state = environment.reset()[0] # Reset the environment and obtain the initial state
             done = False # Will be True when the episode is end
             while not done: # Run the episode
                 # Get the batch from memory
@@ -177,8 +189,9 @@ class Autopilot:
                 # Choose an action using randomness
                 action = self.__decide(curr_state)
                 # Take the action
-                prev_state = curr_state
-                curr_state, reward, done, info = environment.step(action)
+                prev_state = deepcopy(curr_state)
+                curr_state, reward, term, trunc = environment.step(action)[:4]
+                done = term or trunc
                 # Save the transition from state1 to state2
                 transition = (prev_state, action, reward, curr_state, done)
                 # Append the transition to the training batch
@@ -256,16 +269,20 @@ def bin_mean(x, window=10):
     bin_size = np.sum(kernel, axis=0)
     return x @ kernel / bin_size
 
-def play(environment, agent, render=False, sleep=0):
+def play(agent, sleep=0, random_state=None, render=False):
     """
     Play with the agent: land on the Moon!
 
-    :param environment: the LunarLander-v2 gym environment.
     :param agent: an agent of Autopilot class.
-    :param render: boolean, specifies if render the episode.
     :param sleep: number of seconds elapsing between frames.
+    :param random_state: seed for the environment generation.
+    :param render: boolean, specifies if render the episode.
     """
-    state = environment.reset()
+    environment = gym.make('LunarLander-v2', render_mode='human')
+    if random_state is None:
+        state = environment.reset()[0]
+    else:
+        state = environment.reset(seed=random_state)[0]
     if render == True:
         environment.render()
     else:
@@ -277,7 +294,8 @@ def play(environment, agent, render=False, sleep=0):
         duration += 1
         time.sleep(sleep)
         action = agent.decide(state)
-        state, reward, done, _ = environment.step(action)
+        state, reward, term, trunc = environment.step(action)[:4]
+        done = term or trunc
         episode_reward += reward
         if render == True:
             environment.render()
