@@ -16,7 +16,7 @@ with open('cache/agent.pickle', 'wb') as file:
 with open('cache/agent.pickle', 'rb') as file:
     agent = pickle.load(file)
 
-performances = [ll.play(env, agent) for i in range(1000)]
+performances = [ll.play(agent) for i in range(1000)]
 
 with open('cache/performances.pickle', 'wb') as file:
     pickle.dump(performances, file)

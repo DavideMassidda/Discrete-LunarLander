@@ -7,7 +7,6 @@ from collections import deque
 from copy import deepcopy
 import random
 import time
-import pdb
 
 class Q_Network(nn.Module):
     """
@@ -278,7 +277,8 @@ def play(agent, sleep=0, random_state=None, render=False):
     :param random_state: seed for the environment generation.
     :param render: boolean, specifies if render the episode.
     """
-    environment = gym.make('LunarLander-v2', render_mode='human')
+    render_mode = None if render is False else 'human'
+    environment = gym.make('LunarLander-v2', render_mode=render_mode)
     if random_state is None:
         state = environment.reset()[0]
     else:
@@ -303,15 +303,3 @@ def play(agent, sleep=0, random_state=None, render=False):
         time.sleep(sleep * 2)
         environment.close()
     return {'duration': duration, 'reward': episode_reward, 'rest': reward >= 100, 'solved': episode_reward >= 200}
-
-def test(environment, agent, n_episodes):
-    """
-    Test the agent performance
-
-    :param environment: the LunarLander-v2 gym environment.
-    :param agent: an agent of Autopilot class.
-    :param n_episodes: integer, number of episodes to run.
-    :return: numeric list, total reward obtained at each training episode, sorted in time order.
-    """
-    total_rewards = [play(environment, agent) for i in range(n_episodes)]
-    return total_rewards
